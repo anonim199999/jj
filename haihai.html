@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Main Sebentar Yuk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    #controls {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ctrl-btn {
+  font-size: 6vw; /* Ukuran mengikuti lebar layar */
+  padding: 3vw 4vw;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid white;
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+#direction-buttons {
+  display: flex;
+  gap: 5vw;
+}
+
+/* Sembunyikan tombol kontrol di desktop */
+@media (min-width: 768px) {
+  #controls {
+    display: none;
+  }
+}
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #111;
+      color: white;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    .typing {
+      font-size: 1.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 2px solid white;
+      width: 0;
+      animation: typing 3s steps(30) forwards, blink 0.7s step-end infinite;
+    }
+
+    @keyframes typing {
+      from { width: 0 }
+      to { width: 17ch }
+    }
+
+    @keyframes blink {
+      50% { border-color: transparent }
+    }
+
+    .start-btn {
+      margin-top: 30px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      border: 2px solid white;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      border-radius: 8px;
+      opacity: 0;
+      animation: fadeIn 2s 3s forwards;
+      transition: all 0.3s;
+    }
+
+    .start-btn:hover {
+      background: white;
+      color: #111;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    #gameContainer {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      justify-content: center;
+    }
+
+    #scoreDisplay {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    canvas {
+      background: rgba(255,255,255,0.05);
+      box-shadow: 0 0 12px rgba(0,255,255,0.3);
+    }
+
+    #message {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-top: 20px;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .btn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: 1px solid white;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      background: white;
+      color: #111;
+    }
+
+    .btn.show {
+      opacity: 1;
+      animation: fadeIn 1s forwards;
+    }
+
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="intro">
+  <div class="typing">main sebentar yuk...</div>
+  <button class="start-btn" onclick="startGame()">Mulai Game</button>
+</div>
+
+<div id="gameContainer" class="container">
+  <div id="scoreDisplay">Score: 0</div>
+  <canvas id="tetris" width="240" height="400"></canvas>
+  <!-- Tombol Kontrol untuk HP -->
+<div id="controls" style="margin-top: 20px; display: flex; flex-direction: column; align-items: center;">
+  <div style="margin-bottom: 10px;">
+    <button class="ctrl-btn" onclick="playerRotate()">🔄</button>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <button class="ctrl-btn" onclick="playerMove(-1)">⬅️</button>
+    <button class="ctrl-btn" onclick="playerDrop()">⬇️</button>
+    <button class="ctrl-btn" onclick="playerMove(1)">➡️</button>
+  </div>
+</div>
+  <div id="message">
+    Wah... kamu keren banget 😳<br>
+    Klik ini deh 👉 <button class="btn" onclick="window.open('hahaha.html')">💌</button>
+  </div>
+</div>
+
+<canvas class="particles"></canvas>
+
+<audio id="bg-music" autoplay loop>
+  <source src="lofi.mp3" type="audio/mp3">
+</audio>
+
+<script>
+  function startGame() {
+    document.getElementById('intro').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'flex';
+  }
+
+  const canvas = document.getElementById('tetris');
+  const context = canvas.getContext('2d');
+  context.scale(20, 20);
+
+  const arena = createMatrix(12, 20);
+  const player = { pos: {x:0, y:0}, matrix: null, score: 0 };
+  let dropCounter = 0;
+  let dropInterval = 1000;
+  let lastTime = 0;
+  let messageShown = false;
+
+  function createMatrix(w, h) {
+    const matrix = [];
+    while (h--) matrix.push(new Array(w).fill(0));
+    return matrix;
+  }
+
+  function createPiece(type) {
+    if (type === 'T') return [[0,1,0],[1,1,1],[0,0,0]];
+    if (type === 'O') return [[2,2],[2,2]];
+    if (type === 'L') return [[0,3,0],[0,3,0],[0,3,3]];
+    if (type === 'J') return [[0,4,0],[0,4,0],[4,4,0]];
+    if (type === 'I') return [[0,5,0,0],[0,5,0,0],[0,5,0,0],[0,5,0,0]];
+    if (type === 'S') return [[0,6,6],[6,6,0],[0,0,0]];
+    if (type === 'Z') return [[7,7,0],[0,7,7],[0,0,0]];
+  }
+
+  function drawMatrix(matrix, offset) {
+    matrix.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          context.fillStyle = '#00ffe1';
+          context.fillRect(x + offset.x, y + offset.y, 1, 1);
+        }
+      });
+    });
+  }
+
+  function draw() {
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    drawMatrix(arena, {x:0, y:0});
+    drawMatrix(player.matrix, player.pos);
+  }
+
+  function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          arena[y + player.pos.y][x + player.pos.x] = value;
+        }
+      });
+    });
+  }
+
+  function collide(arena, player) {
+    const m = player.matrix;
+    const o = player.pos;
+    for (let y = 0; y < m.length; ++y) {
+      for (let x = 0; x < m[y].length; ++x) {
+        if (m[y][x] !== 0 &&
+            (arena[y + o.y] &&
+             arena[y + o.y][x + o.x]) !== 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function playerReset() {
+    const pieces = 'TJLOSZI';
+    player.matrix = createPiece(pieces[Math.floor(Math.random() * pieces.length)]);
+    player.pos.y = 0;
+    player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    if (collide(arena, player)) {
+      arena.forEach(row => row.fill(0));
+      player.score = 0;
+      updateScore();
+      hideMessage();
+    }
+  }
+
+  function playerMove(dir) {
+    player.pos.x += dir;
+    if (collide(arena, player)) player.pos.x -= dir;
+  }
+
+  function playerDrop() {
+    player.pos.y++;
+    if (collide(arena, player)) {
+      player.pos.y--;
+      merge(arena, player);
+      playerReset();
+      arenaSweep();
+      updateScore();
+    }
+    dropCounter = 0;
+  }
+
+  function playerRotate() {
+    const m = player.matrix;
+    for (let y = 0; y < m.length; ++y) {
+      for (let x = 0; x < y; ++x) {
+        [m[x][y], m[y][x]] = [m[y][x], m[x][y]];
+      }
+    }
+    m.forEach(row => row.reverse());
+    if (collide(arena, player)) {
+      m.forEach(row => row.reverse());
+      for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+          [m[x][y], m[y][x]] = [m[y][x], m[x][y]];
+        }
+      }
+    }
+  }
+
+  function arenaSweep() {
+    let rowCount = 1;
+    outer: for (let y = arena.length - 1; y >= 0; --y) {
+      for (let x = 0; x < arena[y].length; ++x) {
+        if (arena[y][x] === 0) continue outer;
+      }
+      const row = arena.splice(y, 1)[0].fill(0);
+      arena.unshift(row);
+      ++y;
+      player.score += rowCount * 10;
+      rowCount *= 2;
+    }
+  }
+
+  function updateScore() {
+    document.getElementById('scoreDisplay').textContent = 'Score: ' + player.score;
+    if (player.score >= 50 && !messageShown) {
+      showMessage();
+      messageShown = true;
+    }
+  }
+
+  function showMessage() {
+    document.getElementById('message').style.opacity = 1;
+    document.querySelector('.btn').classList.add('show');
+  }
+
+  function hideMessage() {
+    messageShown = false;
+    document.getElementById('message').style.opacity = 0;
+    document.querySelector('.btn').classList.remove('show');
+  }
+
+  function update(time = 0) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+    dropCounter += deltaTime;
+    if (dropCounter > dropInterval) {
+      playerDrop();
+    }
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.keyCode === 37) playerMove(-1);
+    else if (event.keyCode === 39) playerMove(1);
+    else if (event.keyCode === 40) playerDrop();
+    else if (event.keyCode === 38) playerRotate();
+  });
+
+  playerReset();
+  update();
+
+  // Particles background
+  const pCanvas = document.querySelector('.particles');
+  const pCtx = pCanvas.getContext('2d');
+  pCanvas.width = window.innerWidth;
+  pCanvas.height = window.innerHeight;
+
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random() * pCanvas.width,
+    y: Math.random() * pCanvas.height,
+    radius: Math.random() * 2 + 1,
+    speedX: Math.random() * 1 - 0.5,
+    speedY: Math.random() * 1 - 0.5
+  }));
+
+  function drawParticles() {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    pCtx.fillStyle = 'rgba(255,255,255,0.2)';
+    particles.forEach(p => {
+      pCtx.beginPath();
+      pCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      pCtx.fill();
+      p.x += p.speedX;
+      p.y += p.speedY;
+      if (p.x < 0 || p.x > pCanvas.width) p.speedX *= -1;
+      if (p.y < 0 || p.y > pCanvas.height) p.speedY *= -1;
+    });
+    requestAnimationFrame(drawParticles);
+  }
+  drawParticles();
+</script>
+</body>
+</html>
